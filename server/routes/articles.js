@@ -3,11 +3,11 @@ const { body } = require("express-validator");
 const slugify = require("slugify");
 
 const Article = require("../models/Article");
-const sampleArticles = require("../data/sampleArticles");
 const validate = require("../middleware/validate");
 const { protect, requireRole, requireApproved } = require("../middleware/auth");
 
 const router = express.Router();
+const memoryArticles = [];
 
 const memoryProtect = (req, res, next) => {
   if (req.app.locals.useMemory) return next();
@@ -68,7 +68,7 @@ router.get("/", async (req, res) => {
   const { q, category, tag, limit, page, from, to, sort, trending } = req.query;
   if (req.app.locals.useMemory) {
     return res.json(
-      filterMemoryArticles(sampleArticles, { q, category, tag, limit, page, from, to, sort, trending })
+      filterMemoryArticles(memoryArticles, { q, category, tag, limit, page, from, to, sort, trending })
     );
   }
 
@@ -114,7 +114,7 @@ router.get("/", async (req, res) => {
 router.get("/admin/all", memoryProtect, memoryRole("editor", "admin"), async (req, res) => {
   const { q, category, tag, limit, page } = req.query;
   if (req.app.locals.useMemory) {
-    return res.json(filterMemoryArticles(sampleArticles, { q, category, tag, limit, page }));
+    return res.json(filterMemoryArticles(memoryArticles, { q, category, tag, limit, page }));
   }
 
   try {
@@ -150,7 +150,7 @@ router.get(
   memoryRole("admin"),
   async (req, res) => {
     if (req.app.locals.useMemory) {
-      const items = sampleArticles.filter((a) => a.createdBy === req.params.id);
+      const items = memoryArticles.filter((a) => a.createdBy === req.params.id);
       return res.json(items);
     }
 
@@ -170,7 +170,7 @@ router.get("/:slug", async (req, res) => {
   const { view } = req.query;
 
   if (req.app.locals.useMemory) {
-    const article = sampleArticles.find((a) => a.slug === slug);
+    const article = memoryArticles.find((a) => a.slug === slug);
     if (!article) return res.status(404).json({ message: "Not found" });
     if (view === "1") article.views = (article.views || 0) + 1;
     return res.json(article);
@@ -212,7 +212,7 @@ router.post(
     }
 
     if (req.app.locals.useMemory) {
-      sampleArticles.unshift(payload);
+      memoryArticles.unshift(payload);
       return res.status(201).json(payload);
     }
 
@@ -239,14 +239,14 @@ router.put(
   validate,
   async (req, res) => {
     if (req.app.locals.useMemory) {
-      const index = sampleArticles.findIndex((a) => a.slug === req.params.id || a._id === req.params.id);
+      const index = memoryArticles.findIndex((a) => a.slug === req.params.id || a._id === req.params.id);
       if (index === -1) return res.status(404).json({ message: "Not found" });
-      const next = { ...sampleArticles[index], ...req.body };
+      const next = { ...memoryArticles[index], ...req.body };
       if (next.status === "published" && !next.publishedAt) {
         next.publishedAt = new Date().toISOString();
       }
-      sampleArticles[index] = next;
-      return res.json(sampleArticles[index]);
+      memoryArticles[index] = next;
+      return res.json(memoryArticles[index]);
     }
 
     try {
@@ -268,9 +268,9 @@ router.put(
 
 router.delete("/:id", memoryProtect, memoryRole("admin"), async (req, res) => {
   if (req.app.locals.useMemory) {
-    const index = sampleArticles.findIndex((a) => a.slug === req.params.id || a._id === req.params.id);
+    const index = memoryArticles.findIndex((a) => a.slug === req.params.id || a._id === req.params.id);
     if (index === -1) return res.status(404).json({ message: "Not found" });
-    const removed = sampleArticles.splice(index, 1);
+    const removed = memoryArticles.splice(index, 1);
     return res.json({ removed: removed[0] });
   }
 
